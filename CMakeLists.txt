@@ -39,26 +39,26 @@ message(STATUS "Target 'cpp_benchmark' builds against liblock++ (Modern C++ API)
 
 # --- Sanitizer and Compiler Flags ---
 # Define the sanitizer flags in a list for clarity.
-set(TSAN_COMPILE_FLAGS "-fsanitize=address" "-g" "-fno-omit-frame-pointer")
-set(TSAN_LINK_FLAGS "-fsanitize=address")
+#set(TSAN_COMPILE_FLAGS "-fsanitize=thread" "-g" "-fno-omit-frame-pointer")
+#set(TSAN_LINK_FLAGS "-fsanitize=thread")
 # Define the sanitizer flags in a list for clarity.
-#set(TSAN_COMPILE_FLAGS "")
-#set(TSAN_LINK_FLAGS "")
+set(TSAN_COMPILE_FLAGS "")
+set(TSAN_LINK_FLAGS "")
 
 # Apply flags to all targets using the modern, per-target approach.
 # This is much safer and more reliable than setting global CMAKE_C_FLAGS.
-foreach(target c_benchmark cpp_benchmark liblock liblock++)
+foreach (target c_benchmark cpp_benchmark liblock liblock++)
     # Add common warning flags
-    target_compile_options(${target} PRIVATE -Wall -Wextra)
+    target_compile_options(${target} PRIVATE -Wall -Wextra -O3 -march=native -Ofast)
 
     # Add ThreadSanitizer compile flags
     target_compile_options(${target} PRIVATE ${TSAN_COMPILE_FLAGS})
 
     # Add ThreadSanitizer link flags (crucial for linking the TSan runtime)
     target_link_options(${target} PRIVATE ${TSAN_LINK_FLAGS})
-endforeach()
+endforeach ()
 
 # Apply optimization for realistic performance numbers on benchmarks.
 # Note: Sanitizers often work best with -O1, but we will keep your -O3 for now.
-target_compile_options(c_benchmark PRIVATE -O3  -march=native -Ofast)
-target_compile_options(cpp_benchmark PRIVATE -O3  -march=native -Ofast -flto)
+target_compile_options(c_benchmark PRIVATE -O3 -march=native -Ofast)
+target_compile_options(cpp_benchmark PRIVATE -O3 -march=native -Ofast -flto)

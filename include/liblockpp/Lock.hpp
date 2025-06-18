@@ -20,10 +20,11 @@ public:
     friend Lock* create_lock_object(lock_type_t type);
 
     // Make the class non-copyable but movable
-    Lock(const Lock&) = delete;
-    Lock& operator=(const Lock&) = delete;
-    Lock(Lock&&) noexcept;
-    Lock& operator=(Lock&&) noexcept;
+    Lock(const Lock &) = delete;
+    Lock & operator = (const Lock &) = delete;
+    Lock(Lock &&)
+    noexcept;
+    Lock & operator = (Lock &&) noexcept;
     ~Lock();
 
 private:
@@ -31,7 +32,7 @@ private:
 
     // Using the PIMPL idiom to hide implementation details
     class LockImpl;
-    std::unique_ptr<LockImpl> pimpl;
+    std::unique_ptr < LockImpl > pimpl;
 };
 
 #endif // LOCK_HPP

@@ -8,6 +8,7 @@
 #include <numeric>
 
 #define MAX_THREADS 20
+// #define INCREMENTS_PER_THREAD 1000
 #define INCREMENTS_PER_THREAD 1000000
 
 // --- Shared Data ---
