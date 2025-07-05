@@ -1,0 +1,122 @@
+# GitHub Actions Workflow for building and publishing a C/C++ CMake project
+#
+# This workflow is triggered when a new tag matching the pattern 'v*' (e.g., v1.0, v1.2.3) is pushed.
+# It builds the project on Ubuntu, Windows, and macOS.
+# After a successful build on all platforms, it creates a GitHub Release
+# and uploads the packaged library files as release assets.
+
+name: Release C/C++ Library
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events, but only for tags that match 'v*'
+  push:
+    tags:
+      - 'v*'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This job builds the library on multiple operating systems
+  build:
+    name: Build on ${{ matrix.os }}
+    # The type of runner that the job will run on
+    runs-on: ${{ matrix.os }}
+
+    # A matrix strategy allows you to run the job on multiple combinations of configurations.
+    strategy:
+      matrix:
+        # Define the operating systems to build on
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # You can add other matrix variables here, like compiler versions
+        # include:
+        #   - os: ubuntu-latest
+        #     compiler: gcc
+        #   - os: windows-latest
+        #     compiler: msvc
+
+    steps:
+      # 1. Check-out the repository code so the workflow can access it
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configure the CMake project
+      #    -S . specifies the source directory is the current directory.
+      #    -B build specifies that the build files should be generated in a 'build' directory.
+      #    CMAKE_BUILD_TYPE=Release optimizes the build for performance.
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      # 3. Build the project using the configuration generated in the previous step
+      #    --config Release specifies the build configuration.
+      #    --parallel adds parallelism to speed up the build.
+      - name: Build project
+        run: cmake --build build --config Release --parallel
+
+      # 4. "Install" the project. This step copies the final library files, headers,
+      #    and any other specified assets into a staging directory ('install' in this case).
+      #    This makes it easy to package the final distributable artifacts.
+      #    Your CMakeLists.txt must have an `install()` command for this to work.
+      - name: Install project
+        run: cmake --install build --prefix "install"
+
+      # 5. Package the installed files into an archive.
+      #    The archive name is dynamically set based on the operating system.
+      - name: Package artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: tar -czvf release.tar.gz -C install .
+
+      - name: Package artifacts (Windows)
+        if: runner.os == 'Windows'
+        # Using PowerShell to create a ZIP archive on Windows runners
+        run: |
+          Compress-Archive -Path install/* -DestinationPath release.zip
+
+      # 6. Upload the created package as a workflow artifact.
+      #    This allows the 'publish' job to download and use it later.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.os }}
+          path: |
+            release.tar.gz
+            release.zip
+          if-no-files-found: error # Fails the step if the archive isn't found
+
+  # This job runs after all 'build' jobs have completed successfully.
+  # It creates the GitHub Release and uploads the artifacts.
+  publish:
+    name: Publish Release
+    # This job requires the 'build' job to succeed
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Grant permissions for the GITHUB_TOKEN to create releases and write assets.
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Download all the build artifacts (packages) that were uploaded by the build jobs.
+      #    The artifacts will be placed in a directory named after the artifact name (e.g., 'package-ubuntu-latest').
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # 2. List files for debugging purposes to ensure artifacts were downloaded correctly.
+      - name: List downloaded files
+        run: ls -R artifacts
+
+      # 3. Create a new GitHub Release.
+      #    This action uses the tag that triggered the workflow as the release name.
+      #    It then uploads all files matching the specified path as release assets.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # The `files` input supports glob patterns to upload multiple files.
+          # This will upload the tar.gz and .zip files from all build jobs.
+          files: |
+            artifacts/package-ubuntu-latest/release.tar.gz
+            artifacts/package-windows-latest/release.zip
+            artifacts/package-macos-latest/release.tar.gz

@@ -62,3 +62,33 @@ endforeach ()
 # Note: Sanitizers often work best with -O1, but we will keep your -O3 for now.
 target_compile_options(c_benchmark PRIVATE -O3 -march=native -Ofast)
 target_compile_options(cpp_benchmark PRIVATE -O3 -march=native -Ofast -flto)
+
+
+install(TARGETS liblock
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+)
+
+install(FILES
+        include/liblock/lock_c_api.h
+        include/lock.h
+        include/lock_types.h
+        DESTINATION include/liblock
+)
+
+
+install(TARGETS liblock++
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+)
+
+install(FILES
+        include/liblockpp/Lock.hpp
+        include/liblockpp/ILock.hpp
+        include/lock.h
+        include/lock_types.h
+        DESTINATION include/liblockpp
+)
+
