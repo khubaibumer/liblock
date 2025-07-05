@@ -1,0 +1,93 @@
+# CircleCI Configuration for building and publishing a simple C/C++ CMake project for Linux
+#
+# This workflow is triggered when a new tag matching the pattern 'v*' (e.g., v1.0, v1.2.3) is pushed.
+# It builds the project, then creates a GitHub Release and uploads the compiled library as a release asset.
+#
+# Before using, you must set the following environment variable in your CircleCI project settings:
+# GITHUB_TOKEN: A GitHub token with the `repo` scope.
+
+version: 2.1
+
+# Jobs define the individual stages of the CI/CD process.
+jobs:
+  # This job builds the library and prepares the artifacts.
+  build:
+    docker:
+      # Use a standard CircleCI image with common build tools.
+      - image: cimg/base:2024.01
+    steps:
+      - checkout
+      - run:
+          name: "Install CMake and Build Tools"
+          # Update package lists and install cmake.
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y cmake build-essential
+      - run:
+          name: "Configure CMake"
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run:
+          name: "Build Project"
+          command: cmake --build build --config Release --parallel
+      - run:
+          name: "Install Project"
+          # This creates a clean 'install' directory with the final library files.
+          command: cmake --install build --prefix "install"
+      - run:
+          name: "Package Artifacts"
+          # Create a tarball from the 'install' directory.
+          command: tar -czvf release.tar.gz -C install .
+      - persist_to_workspace:
+          # Persist the tarball to the workspace,
+          # making it available to the downstream 'publish' job.
+          root: .
+          paths:
+            - release.tar.gz
+
+  # This job creates a GitHub Release and uploads the artifact.
+  publish:
+    docker:
+      # Use a standard CircleCI image.
+      - image: cimg/base:2024.01
+    steps:
+      - attach_workspace:
+          # Retrieve the tarball from the 'build' job.
+          at: .
+      - run:
+          name: "Install and Authenticate GitHub CLI"
+          command: |
+            # Install GitHub CLI using the official script
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update
+            sudo apt-get install -y gh
+            # Authenticate with GitHub using the token stored in the GITHUB_TOKEN environment variable
+            echo "${GITHUB_TOKEN}" | gh auth login --with-token
+      - run:
+          name: "Create GitHub Release"
+          # Use the GitHub CLI to create a release, using the Git tag as the name.
+          # It attaches the 'release.tar.gz' file as a release asset.
+          command: |
+            gh release create "$CIRCLE_TAG" "release.tar.gz" --title "$CIRCLE_TAG" --notes "Release $CIRCLE_TAG"
+
+# Workflows define the order and conditions for running jobs.
+workflows:
+  release-workflow:
+    jobs:
+      - build:
+          filters:
+            # This job will only run for Git tags, not on every commit.
+            branches:
+              ignore: /.*/
+            tags:
+              # It will only run for tags that start with 'v' (e.g., v1.0, v2.3.4).
+              only: /^v.*/
+      - publish:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
