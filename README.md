@@ -31,7 +31,7 @@ The library supports common CPU architectures including:
 1. **Clone the Repository**:
 ```shell script
 git clone <repository-url>
-   cd DualLockLibrary
+   cd liblock
 ```
 
 
